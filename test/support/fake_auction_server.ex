@@ -54,7 +54,7 @@ defmodule FakeAuctionServer do
   end
 
   def handle_info(msg, state) do
-    IO.inspect msg
+    Logger.warn("FakeAuctionServer got unhandled message #{inspect msg}")
     :inet.setopts(state.client, [active: :once])
     {:noreply, state}
   end

@@ -34,6 +34,6 @@ defmodule Sniper.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:httpoison, "~> 0.11.0"}]
+    [{:credo, "~> 0.5", only: [:dev, :test]}]
   end
 end
