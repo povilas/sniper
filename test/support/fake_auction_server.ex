@@ -16,7 +16,11 @@ defmodule FakeAuctionServer do
 
   def announce_closed(), do: GenServer.call(__MODULE__, :announce_closed)
 
-  def has_received_join_request_from_sniper(), do: Util.wait_for :auction_has_received_join_request_from_sniper
+  def report_price(price, increment, bidder), do: GenServer.call(__MODULE__, {:report_price, price, increment, bidder})
+
+  def has_received_join_request_from(bidder), do: Util.wait_for {:auction_has_received_join_request_from, bidder}
+
+  def has_received_bid(price, _), do: Util.wait_for {:auction_has_received_bid, price}
 
   def handle_cast(:start_selling_item, state) do
     {:ok, socket} = :gen_tcp.listen(8080, [:binary, packet: :line, active: :once, reuseaddr: true])
@@ -25,14 +29,27 @@ defmodule FakeAuctionServer do
     {:noreply, %{state | socket: socket, client: client}}
   end
 
-  def handle_call(:announce_closed, _from, state) do
-    :ok = :gen_tcp.send(state.client, "LOST\r\n")
+  def handle_call({:report_price, price, increment, bidder}, _from, state) do
+    :ok = :gen_tcp.send(state.client, "PRICE #{price},#{increment},#{bidder}\r\n")
     {:reply, :ok, state}
   end
 
-  def handle_info({:tcp, _from, "JOIN" <> _}, state) do
+  def handle_call(:announce_closed, _from, state) do
+    :ok = :gen_tcp.send(state.client, "CLOSE\r\n")
+    {:reply, :ok, state}
+  end
+
+  def handle_info({:tcp, _from, "JOIN" <> msg}, state) do
+    bidder = msg |> String.trim
     :inet.setopts(state.client, [active: :once])
-    send state.listener, :auction_has_received_join_request_from_sniper
+    send state.listener, {:auction_has_received_join_request_from, bidder}
+    {:noreply, state}
+  end
+
+  def handle_info({:tcp, _from, "BID" <> msg}, state) do
+    price = msg |> String.trim |> String.to_integer
+    :inet.setopts(state.client, [active: :once])
+    send state.listener, {:auction_has_received_bid, price}
     {:noreply, state}
   end
 

@@ -1,6 +1,13 @@
 defmodule Sniper do
+
   require Logger
   use GenServer
+  alias Sniper.ClientEvent
+  alias Sniper.ClientCommand
+  alias Sniper.ClientCommandHandler
+  alias Sniper.AuctionCommand
+  alias Sniper.AuctionEvent
+  alias Sniper.AuctionEventHandler
 
   def start_link() do
     GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
@@ -24,26 +31,47 @@ defmodule Sniper do
 
   def handle_info({:tcp, client, msg}, %{client: client} = state) do
     :inet.setopts(client, [active: :once])
-    {:noreply, handle_client(msg, state)}
+    command = ClientCommand.decode(msg)
+
+    state = if command == %ClientCommand.Start{} do
+      {:ok, auction} = :gen_tcp.connect('localhost', 8080, [:binary, packet: :line, active: :once])
+       %{state | auction: auction}
+    else
+      state
+    end
+
+    msgs = ClientCommandHandler.handle(command)
+    send_messages(msgs, state)
+    {:noreply, state}
+  end
+
+  def handle_info({:tcp_closed, client}, %{client: client} = state) do
+    :inet.setopts(client, [active: :once])
+    send self(), :accept_connection
+    {:noreply, %{state | client: nil}}
   end
 
   def handle_info({:tcp, auction, msg}, %{auction: auction} = state) do
     :inet.setopts(auction, [active: :once])
-    {:noreply, handle_auction(msg, state)}
+    event = AuctionEvent.decode(msg)
+    msgs = AuctionEventHandler.handle(event)
+    send_messages(msgs, state)
+    {:noreply, state}
   end
 
   def handle_info(_msg, state), do: {:noreply, state}
 
-  def handle_client("START" <> _, state) do
-    {:ok, auction} = :gen_tcp.connect('localhost', 8080, [:binary, packet: :line, active: :once])
-    Logger.info "Sniper joining auction"
-    :ok = :gen_tcp.send(auction, "JOIN\r\n")
-    %{state| auction: auction}
+  defp send_messages([], _state), do: :ok
+
+  defp send_messages([{:client, msg} | t], state) do
+    raw = ClientEvent.encode(msg)
+    :ok = :gen_tcp.send(state.client, raw)
+    send_messages(t, state)
   end
 
-  def handle_auction("LOST" <> _, state) do
-    Logger.info "Sniper lost auction"
-    :ok = :gen_tcp.send(state.client, "LOST\r\n")
-    state
+  defp send_messages([{:auction, msg} | t], state) do
+    raw = AuctionCommand.encode(msg)
+    :ok = :gen_tcp.send(state.auction, raw)
+    send_messages(t, state)
   end
 end

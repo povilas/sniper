@@ -10,7 +10,18 @@ defmodule SniperE2ETest do
   test "sniper joins auction until auction closes", %{auction: auction, sniper: sniper} do
     auction.start_selling_item()
     sniper.start_bidding()
-    assert auction.has_received_join_request_from_sniper()
+    assert auction.has_received_join_request_from("sniper")
+    auction.announce_closed()
+    assert sniper.shows_sniper_has_lost_auction()
+  end
+
+  test "sniper makes a higher bid but loses", %{auction: auction, sniper: sniper} do
+    auction.start_selling_item()
+    sniper.start_bidding()
+    assert auction.has_received_join_request_from("sniper")
+    auction.report_price(1000, 98, "other bidder")
+    assert sniper.showns_it_is_bidding()
+    assert auction.has_received_bid(1098, "sniper")
     auction.announce_closed()
     assert sniper.shows_sniper_has_lost_auction()
   end
