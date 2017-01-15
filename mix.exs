@@ -8,7 +8,9 @@ defmodule Sniper.Mixfile do
      elixirc_paths: elixirc_paths(Mix.env),
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
-     deps: deps()]
+     deps: deps(),
+     test_coverage: [tool: ExCoveralls],
+     preferred_cli_env: ["coveralls": :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test]]
   end
 
   # Specifies which paths to compile per environment.
@@ -34,6 +36,7 @@ defmodule Sniper.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:credo, "~> 0.5", only: [:dev, :test]}]
+    [{:credo, "~> 0.5", only: [:dev, :test]},
+     {:excoveralls, "~> 0.5", only: :test}]
   end
 end
