@@ -20,7 +20,11 @@ defmodule Sniper do
     {:ok, %{
       socket: socket,
       client: nil,
-      auction: nil
+      auction: nil,
+      handler_state: %{
+        id: "sniper",
+        winning: false
+      }
     }}
   end
 
@@ -40,23 +44,28 @@ defmodule Sniper do
       state
     end
 
-    msgs = ClientCommandHandler.handle(command)
+    {:ok, msgs, handler_state} = ClientCommandHandler.handle(command, state.handler_state)
     send_messages(msgs, state)
-    {:noreply, state}
+    {:noreply, %{state | handler_state: handler_state}}
   end
 
   def handle_info({:tcp_closed, client}, %{client: client} = state) do
-    :inet.setopts(client, [active: :once])
     send self(), :accept_connection
-    {:noreply, %{state | client: nil}}
+    {:noreply, %{state |
+      client: nil,
+      handler_state: %{
+        id: "sniper",
+        winning: false
+      }
+    }}
   end
 
   def handle_info({:tcp, auction, msg}, %{auction: auction} = state) do
     :inet.setopts(auction, [active: :once])
     event = AuctionEvent.decode(msg)
-    msgs = AuctionEventHandler.handle(event)
+    {:ok, msgs, handler_state} = AuctionEventHandler.handle(event, state.handler_state)
     send_messages(msgs, state)
-    {:noreply, state}
+    {:noreply, %{state | handler_state: handler_state}}
   end
 
   def handle_info(_msg, state), do: {:noreply, state}

@@ -1,15 +1,9 @@
-defmodule Sniper.AuctionEvent do
+defmodule Sniper.ClientCommand do
 
-  defmodule Closed, do: defstruct []
-  defmodule Price, do: defstruct [:price, :increment]
+  defmodule Start, do: defstruct []
 
-  def decode("CLOSE" <> _) do
-    %Closed{}
+  def decode("START" <> _) do
+    %Start{}
   end
 
-  def decode("PRICE" <> msg) do
-    [price, increment, _] = msg |> String.trim |> String.split(",")
-    %Price{price: String.to_integer(price), increment: String.to_integer(increment)}
-  end
-  
 end

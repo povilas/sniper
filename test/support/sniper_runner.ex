@@ -13,9 +13,13 @@ defmodule SniperRunner do
 
   def start_bidding(), do: GenServer.call(__MODULE__, :start_bidding)
 
-  def shows_sniper_has_lost_auction(), do: Util.wait_for :sniper_shows_sniper_has_lost_auction
+  def shows_it_has_lost_auction(), do: Util.wait_for :sniper_shows_it_has_lost_auction
 
-  def showns_it_is_bidding(), do: Util.wait_for :sniper_shows_it_is_bidding
+  def shows_it_is_bidding(), do: Util.wait_for :sniper_shows_it_is_bidding
+
+  def shows_it_is_winning(), do: Util.wait_for :sniper_shows_it_is_winning
+
+  def shows_it_has_won_auction(), do: Util.wait_for :sniper_shows_it_has_won_auction
 
   def handle_call(:start_bidding, _from, state) do
     :ok = :gen_tcp.send(state.sniper, "START\r\n")
@@ -24,7 +28,7 @@ defmodule SniperRunner do
 
   def handle_info({:tcp, sniper, "LOST" <> _}, %{sniper: sniper, listener: listener} = state) do
     :inet.setopts(sniper, [active: :once])
-    send listener, :sniper_shows_sniper_has_lost_auction
+    send listener, :sniper_shows_it_has_lost_auction
     {:noreply, state}
   end
 
@@ -33,4 +37,17 @@ defmodule SniperRunner do
     send listener, :sniper_shows_it_is_bidding
     {:noreply, state}
   end
+
+  def handle_info({:tcp, sniper, "I'M WINNING" <> _}, %{sniper: sniper, listener: listener} = state) do
+    :inet.setopts(sniper, [active: :once])
+    send listener, :sniper_shows_it_is_winning
+    {:noreply, state}
+  end
+
+  def handle_info({:tcp, sniper, "WON" <> _}, %{sniper: sniper, listener: listener} = state) do
+    :inet.setopts(sniper, [active: :once])
+    send listener, :sniper_shows_it_has_won_auction
+    {:noreply, state}
+  end
+
 end

@@ -10,7 +10,7 @@ defmodule Sniper.AuctionEventTest do
   end
 
   test "decode price" do
-    assert decode("PRICE 123,5,Mike\r\n") == %Price{price: 123, increment: 5}
+    assert decode("PRICE 123,5,Mike\r\n") == %Price{price: 123, increment: 5, bidder: "Mike"}
   end
 
 end
