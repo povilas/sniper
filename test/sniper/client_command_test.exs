@@ -5,7 +5,8 @@ defmodule Sniper.ClientCommandTest do
   alias Sniper.ClientCommand.Start
 
   test "decode start" do
-    assert decode("START\r\n") == %Start{}
+    assert decode("START name,item\r\n") == %Start{id: "name", item: "item", price: :undefined}
+    assert decode("START name,item,20\r\n") == %Start{id: "name", item: "item", price: 20}
   end
 
 end

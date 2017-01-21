@@ -9,7 +9,10 @@ defmodule Sniper.AuctionEvent do
 
   def decode("PRICE" <> msg) do
     [price, increment, bidder] = msg |> String.trim |> String.split(",")
-    %Price{price: String.to_integer(price), increment: String.to_integer(increment), bidder: bidder}
+    %Price{
+      price: String.to_integer(price),
+      increment: String.to_integer(increment),
+      bidder: bidder}
   end
 
 end

@@ -14,11 +14,15 @@ defmodule Sniper do
   end
 
   def init(client) do
+    {:ok, auction} = :gen_tcp.connect('localhost', 8080, [:binary, packet: :line, active: :once])
     {:ok, %{
       client: client,
-      auction: nil,
+      auction: auction,
       handler_state: %{
         id: "sniper",
+        item: nil,
+        stop_price: :undefined,
+        last_bid: nil,
         winning: false
       }
     }}
@@ -27,14 +31,6 @@ defmodule Sniper do
   def handle_info({:tcp, client, msg}, %{client: client} = state) do
     :inet.setopts(client, [active: :once])
     command = ClientCommand.decode(msg)
-
-    state = if command == %ClientCommand.Start{} do
-      {:ok, auction} = :gen_tcp.connect('localhost', 8080, [:binary, packet: :line, active: :once])
-       %{state | auction: auction}
-    else
-      state
-    end
-
     {:ok, msgs, handler_state} = ClientCommandHandler.handle(command, state.handler_state)
     state = %{state | handler_state: handler_state}
     send_messages(msgs, state)

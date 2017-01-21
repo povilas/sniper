@@ -64,12 +64,10 @@ defmodule FakeAuctionServer do
     case Registry.start_link(:unique, FakeAuction.Registry) do
       {:error, {:already_started, pid}} ->
         Process.exit(pid, :kill)
-        :timer.sleep(100)
-        {:ok, _} = Registry.start_link(:unique, FakeAuction.Registry)
-      {:ok, _} -> :ok
+        start_link()
+      {:ok, _} ->
+        GenServer.start_link(__MODULE__, self(), name: __MODULE__)
     end
-
-    GenServer.start_link(__MODULE__, self(), name: __MODULE__)
   end
 
   def start_selling_item(item), do: GenServer.cast(__MODULE__, {:start_selling_item, item})

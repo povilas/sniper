@@ -76,4 +76,22 @@ defmodule SniperE2ETest do
     assert sniper.shows_it_has_won_auction("item-2")
   end
 
+  test "sniper loses an auction when the price is too damn high", %{auction: auction, sniper: sniper} do
+    auction.start_selling_item("item-1")
+    sniper.start_bidding("item-1", 1100)
+    assert auction.has_received_join_request_from("item-1", "sniper")
+
+    auction.report_price("item-1", 1000, 98, "other bidder")
+    assert sniper.shows_it_is_bidding("item-1")
+    assert auction.has_received_bid("item-1", 1098, "sniper")
+
+    auction.report_price("item-1", 1197, 10, "third party")
+    assert sniper.shows_it_is_losing("item-1", 1197, 1098)
+
+    auction.report_price("item-1", 1207, 10, "fourth party")
+    assert sniper.shows_it_is_losing("item-1", 1207, 1098)
+
+    auction.announce_closed("item-1")
+    assert sniper.shows_it_has_lost_auction("item-1")
+  end
 end

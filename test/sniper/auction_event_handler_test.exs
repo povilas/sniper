@@ -17,11 +17,11 @@ defmodule Sniper.AuctionEventHandlerTest do
   end
 
   test "handle price update as bid if price was by other bidder" do
-    state = %{id: "sniper"}
+    state = %{id: "sniper", stop_price: :undefined, last_bid: nil}
     assert handle(%AuctionEvent.Price{price: 123, increment: 5, bidder: "other"}, state) ==
       {:ok,
        [client: %ClientEvent.Bidding{}, auction: %AuctionCommand.Bid{price: 128}],
-       state}
+       %{id: "sniper", stop_price: :undefined, last_bid: 128}}
   end
 
   test "handle price update as winning if bid was by sniper" do
@@ -30,6 +30,14 @@ defmodule Sniper.AuctionEventHandlerTest do
       {:ok,
        [client: %ClientEvent.Winning{}],
        %{id: "sniper", winning: true}}
+  end
+
+  test "handle price update as losing if bid would be higher ten stop price" do
+    state = %{id: "sniper", stop_price: 127, last_bid: 99, winning: true}
+    assert handle(%AuctionEvent.Price{price: 123, increment: 5, bidder: "other"}, state) ==
+      {:ok,
+       [client: %ClientEvent.Losing{last_price: 123, last_bid: 99}],
+       state}
   end
 
 end
