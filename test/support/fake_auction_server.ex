@@ -1,32 +1,19 @@
-defmodule FakeAuctionServer do
+defmodule FakeAuctionServer.Client do
   require Logger
   use GenServer
 
-  def start_link(), do: GenServer.start_link(__MODULE__, self(), name: __MODULE__)
-
-  def init(listener) do
-    {:ok, %{
-      listener: listener,
-      socket: nil,
-      client: nil
-    }}
+  def start_link(listener, socket, item, name) do
+    GenServer.start_link(__MODULE__, [listener, socket, item], name: name)
   end
 
-  def start_selling_item(), do: GenServer.cast(__MODULE__, :start_selling_item)
-
-  def announce_closed(), do: GenServer.call(__MODULE__, :announce_closed)
-
-  def report_price(price, increment, bidder), do: GenServer.call(__MODULE__, {:report_price, price, increment, bidder})
-
-  def has_received_join_request_from(bidder), do: Util.wait_for {:auction_has_received_join_request_from, bidder}
-
-  def has_received_bid(price, _), do: Util.wait_for {:auction_has_received_bid, price}
-
-  def handle_cast(:start_selling_item, state) do
-    {:ok, socket} = :gen_tcp.listen(8080, [:binary, packet: :line, active: :once, reuseaddr: true])
-    Logger.info "FakeAuctionServer listening on 8080"
-    {:ok, client} = :gen_tcp.accept(socket)
-    {:noreply, %{state | socket: socket, client: client}}
+  def init([listener, socket, item]) do
+    send self(), :accept_client
+    {:ok, %{
+      item: item,
+      listener: listener,
+      socket: socket,
+      client: nil
+    }}
   end
 
   def handle_call({:report_price, price, increment, bidder}, _from, state) do
@@ -39,17 +26,23 @@ defmodule FakeAuctionServer do
     {:reply, :ok, state}
   end
 
+  def handle_info(:accept_client, state) do
+    {:ok, client} = :gen_tcp.accept(state.socket)
+    :inet.setopts(client, [active: :once])
+    {:noreply, %{state | client: client}}
+  end
+
   def handle_info({:tcp, _from, "JOIN" <> msg}, state) do
     bidder = msg |> String.trim
     :inet.setopts(state.client, [active: :once])
-    send state.listener, {:auction_has_received_join_request_from, bidder}
+    send state.listener, {:auction_has_received_join_request_from, state.item, bidder}
     {:noreply, state}
   end
 
   def handle_info({:tcp, _from, "BID" <> msg}, state) do
     price = msg |> String.trim |> String.to_integer
     :inet.setopts(state.client, [active: :once])
-    send state.listener, {:auction_has_received_bid, price}
+    send state.listener, {:auction_has_received_bid, state.item, price}
     {:noreply, state}
   end
 
@@ -58,5 +51,51 @@ defmodule FakeAuctionServer do
     :inet.setopts(state.client, [active: :once])
     {:noreply, state}
   end
+
+end
+
+
+defmodule FakeAuctionServer do
+
+  require Logger
+  use GenServer
+
+  def start_link() do
+    case Registry.start_link(:unique, FakeAuction.Registry) do
+      {:error, {:already_started, pid}} ->
+        Process.exit(pid, :kill)
+        :timer.sleep(100)
+        {:ok, _} = Registry.start_link(:unique, FakeAuction.Registry)
+      {:ok, _} -> :ok
+    end
+
+    GenServer.start_link(__MODULE__, self(), name: __MODULE__)
+  end
+
+  def start_selling_item(item), do: GenServer.cast(__MODULE__, {:start_selling_item, item})
+
+  def announce_closed(item), do: GenServer.call(via(item), :announce_closed)
+
+  def report_price(item, price, increment, bidder), do: GenServer.call(via(item), {:report_price, price, increment, bidder})
+
+  def has_received_join_request_from(item, bidder), do: Util.wait_for {:auction_has_received_join_request_from, item, bidder}
+
+  def has_received_bid(item, price, _), do: Util.wait_for {:auction_has_received_bid, item, price}
+
+  def init(listener) do
+    {:ok, socket} = :gen_tcp.listen(8080, [:binary, packet: :line, active: false, reuseaddr: true])
+    Logger.info "FakeAuctionServer listening on 8080"
+    {:ok, %{
+      socket: socket,
+      listener: listener
+    }}
+  end
+
+  def handle_cast({:start_selling_item, item}, state) do
+    {:ok, _} = FakeAuctionServer.Client.start_link(state.listener, state.socket, item, via(item))
+    {:noreply, state}
+  end
+
+  defp via(item), do: {:via, Registry, {FakeAuction.Registry, item}}
 
 end

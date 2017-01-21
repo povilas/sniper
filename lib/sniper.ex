@@ -9,28 +9,19 @@ defmodule Sniper do
   alias Sniper.AuctionEvent
   alias Sniper.AuctionEventHandler
 
-  def start_link() do
-    GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
+  def start(client) do
+    GenServer.start(__MODULE__, client)
   end
 
-  def init(:ok) do
-    {:ok, socket} = :gen_tcp.listen(8081, [:binary, packet: :line, active: :once, reuseaddr: true])
-    Logger.info "Sniper listening on 8081"
-    send self(), :accept_connection
+  def init(client) do
     {:ok, %{
-      socket: socket,
-      client: nil,
+      client: client,
       auction: nil,
       handler_state: %{
         id: "sniper",
         winning: false
       }
     }}
-  end
-
-  def handle_info(:accept_connection, state) do
-    {:ok, client} = :gen_tcp.accept(state.socket)
-    {:noreply, %{state | client: client}}
   end
 
   def handle_info({:tcp, client, msg}, %{client: client} = state) do
@@ -45,19 +36,13 @@ defmodule Sniper do
     end
 
     {:ok, msgs, handler_state} = ClientCommandHandler.handle(command, state.handler_state)
+    state = %{state | handler_state: handler_state}
     send_messages(msgs, state)
-    {:noreply, %{state | handler_state: handler_state}}
+    {:noreply, state}
   end
 
   def handle_info({:tcp_closed, client}, %{client: client} = state) do
-    send self(), :accept_connection
-    {:noreply, %{state |
-      client: nil,
-      handler_state: %{
-        id: "sniper",
-        winning: false
-      }
-    }}
+    {:stop, :normal, state}
   end
 
   def handle_info({:tcp, auction, msg}, %{auction: auction} = state) do
@@ -68,7 +53,9 @@ defmodule Sniper do
     {:noreply, %{state | handler_state: handler_state}}
   end
 
-  def handle_info(_msg, state), do: {:noreply, state}
+  def handle_info({:tcp_closed, auction}, %{auction: auction} = state) do
+    {:stop, :normal, state}
+  end
 
   defp send_messages([], _state), do: :ok
 
@@ -83,4 +70,5 @@ defmodule Sniper do
     :ok = :gen_tcp.send(state.auction, raw)
     send_messages(t, state)
   end
+
 end
