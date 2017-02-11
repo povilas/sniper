@@ -82,7 +82,6 @@ defmodule FakeAuctionServer do
 
   def init(listener) do
     {:ok, socket} = :gen_tcp.listen(8080, [:binary, packet: :line, active: false, reuseaddr: true])
-    Logger.info "FakeAuctionServer listening on 8080"
     {:ok, %{
       socket: socket,
       listener: listener
