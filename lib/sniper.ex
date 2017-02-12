@@ -30,11 +30,16 @@ defmodule Sniper do
 
   def handle_info({:tcp, client, msg}, %{client: client} = state) do
     :inet.setopts(client, [active: :once])
-    command = ClientCommand.decode(msg)
-    {:ok, msgs, handler_state} = ClientCommandHandler.handle(command, state.handler_state)
-    state = %{state | handler_state: handler_state}
-    send_messages(msgs, state)
-    {:noreply, state}
+    case ClientCommand.decode(msg) do
+      {:ok, command} ->
+        {:ok, msgs, handler_state} = ClientCommandHandler.handle(command, state.handler_state)
+        state = %{state | handler_state: handler_state}
+        send_messages(msgs, state)
+        {:noreply, state}
+      {:error, reason} ->
+        :ok = :gen_tcp.send(state.client, "Error: #{inspect reason}\r\v")
+        {:noreply, state}
+    end
   end
 
   def handle_info({:tcp_closed, client}, %{client: client} = state) do

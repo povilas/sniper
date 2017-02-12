@@ -5,8 +5,12 @@ defmodule Sniper.ClientCommandTest do
   alias Sniper.ClientCommand.Start
 
   test "decode start" do
-    assert decode("START name,item\r\n") == %Start{id: "name", item: "item", price: :undefined}
-    assert decode("START name,item,20\r\n") == %Start{id: "name", item: "item", price: 20}
+    assert decode("START name,item\r\n") == {:ok, %Start{id: "name", item: "item", price: :undefined}}
+    assert decode("START name,item,20\r\n") == {:ok, %Start{id: "name", item: "item", price: 20}}
+  end
+
+  test "return error for unknown command" do
+    assert decode("FOOBAR") == {:error, {:unknown_command, "FOOBAR"}}
   end
 
 end
